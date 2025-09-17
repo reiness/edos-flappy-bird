@@ -10,8 +10,8 @@ def draw_floor():
 
 def create_pipe():
     random_pipe_pos = random.choice(pipe_height)
-    bottom_pipe = pipe_surface.get_rect(midtop=(700, random_pipe_pos))
-    top_pipe = pipe_surface.get_rect(midbottom=(700, random_pipe_pos - 300))
+    bottom_pipe = active_pipe_surface.get_rect(midtop=(700, random_pipe_pos))
+    top_pipe = active_pipe_surface.get_rect(midbottom=(700, random_pipe_pos - 300))
     return bottom_pipe, top_pipe
 
 def move_pipes(pipes):
@@ -22,9 +22,9 @@ def move_pipes(pipes):
 def draw_pipes(pipes):
     for pipe in pipes:
         if pipe.bottom >= 1024:
-            screen.blit(pipe_surface, pipe)
+            screen.blit(active_pipe_surface, pipe)
         else:
-            flip_pipe = pygame.transform.flip(pipe_surface, False, True)
+            flip_pipe = pygame.transform.flip(active_pipe_surface, False, True)
             screen.blit(flip_pipe, pipe)
 
 def check_collision(pipes):
@@ -41,7 +41,7 @@ def rotate_bird(bird):
     return pygame.transform.rotozoom(bird, -bird_movement * 3, 1)
 
 def bird_animation():
-    new_bird = bird_frames[bird_index]
+    new_bird = active_bird_frames[bird_index]
     new_bird_rect = new_bird.get_rect(center=(100, bird_rect.centery))
     return new_bird, new_bird_rect
 
@@ -81,7 +81,7 @@ pygame.mixer.pre_init(frequency=44100, size=16, channels=1, buffer=512)
 pygame.init()
 SCREEN_WIDTH, SCREEN_HEIGHT = 576, 1024
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption('Flappy Bird by Pythia')
+pygame.display.set_caption('Flappy Bird by Edo')
 clock = pygame.time.Clock()
 game_font = pygame.font.Font('04B_19.ttf', 35)
 small_font = pygame.font.Font('04B_19.ttf', 25)
@@ -93,21 +93,23 @@ high_score = 0
 pipe_list = []
 player_name = ""
 input_active = False
-score_submitted = False # NEW state variable
+score_submitted = False
 leaderboard_scores = get_high_scores()
 gravity = 0.25
 bird_movement = 0
 
-# --- Assets ---
-bg_surface = pygame.transform.scale2x(pygame.image.load('sprites/background-day.png').convert())
+# --- PRE-LOADING ALL ASSETS ---
+bg_day = pygame.transform.scale2x(pygame.image.load('sprites/background-day.png').convert())
+bg_night = pygame.transform.scale2x(pygame.image.load('sprites/background-night.png').convert())
+backgrounds = {'day': bg_day, 'night': bg_night}
 floor_surface = pygame.transform.scale2x(pygame.image.load('sprites/base.png').convert())
 floor_x_pos = 0
-bird_frames = [pygame.transform.scale2x(pygame.image.load(f'sprites/yellowbird-{flap}.png').convert_alpha()) for flap in ['downflap', 'midflap', 'upflap']]
-bird_index = 0
-bird_surface = bird_frames[bird_index]
-bird_rect = bird_surface.get_rect(center=(100, SCREEN_HEIGHT / 2))
-pipe_surface = pygame.transform.scale2x(pygame.image.load('sprites/pipe-green.png'))
-pipe_height = [400, 600, 800]
+bird_colors = ['red', 'blue', 'yellow']
+birds = {color: [pygame.transform.scale2x(pygame.image.load(f'sprites/{color}bird-{flap}.png').convert_alpha()) for flap in ['downflap', 'midflap', 'upflap']] for color in bird_colors}
+pipe_green = pygame.transform.scale2x(pygame.image.load('sprites/pipe-green.png'))
+pipe_red = pygame.transform.scale2x(pygame.image.load('sprites/pipe-red.png'))
+pipes = {'green': pipe_green, 'red': pipe_red}
+pipe_height = [400, 600, 800] # <-- THE FIX: This line has been restored.
 game_over_surface = pygame.transform.scale2x(pygame.image.load('sprites/gameover.png').convert_alpha())
 game_over_rect = game_over_surface.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 200))
 message_surface = pygame.transform.scale2x(pygame.image.load('sprites/message.png').convert_alpha())
@@ -115,6 +117,14 @@ message_rect = message_surface.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT 
 flap_sound = pygame.mixer.Sound('audio/wing.wav')
 hit_sound = pygame.mixer.Sound('audio/hit.wav')
 score_sound = pygame.mixer.Sound('audio/point.wav')
+
+# --- ACTIVE ASSETS ---
+active_bg = backgrounds['day']
+active_bird_frames = birds['yellow']
+active_pipe_surface = None
+bird_index = 0
+bird_surface = active_bird_frames[bird_index]
+bird_rect = bird_surface.get_rect(center=(100, SCREEN_HEIGHT / 2))
 
 # --- Timed Events ---
 SPAWNPIPE = pygame.USEREVENT
@@ -138,7 +148,7 @@ while True:
                     if event.key == pygame.K_RETURN:
                         submit_score(player_name, score)
                         input_active = False
-                        score_submitted = True # Set the flag after submission
+                        score_submitted = True
                         leaderboard_scores = get_high_scores()
                     elif event.key == pygame.K_BACKSPACE:
                         player_name = player_name[:-1]
@@ -148,23 +158,34 @@ while True:
                     if event.key == pygame.K_SPACE:
                         game_active = True
                         pipe_list.clear()
-                        bird_rect.center=(100, SCREEN_HEIGHT / 2)
                         bird_movement = 0
                         score = 0
-                        score_submitted = False # Reset the flag for the new round
+                        score_submitted = False
+                        
+                        chosen_bird_color = random.choice(bird_colors)
+                        active_bird_frames = birds[chosen_bird_color]
+                        chosen_theme = random.choice(['day', 'night'])
+                        active_bg = backgrounds[chosen_theme]
+                        if chosen_theme == 'day':
+                            active_pipe_surface = pipes['green']
+                        else:
+                            active_pipe_surface = pipes['red']
+                        
+                        bird_rect = active_bird_frames[0].get_rect(center=(100, SCREEN_HEIGHT / 2))
                         pygame.time.set_timer(SPAWNPIPE, 1200)
-                    # Allow typing only if score hasn't been submitted yet for this round
                     elif event.key not in (pygame.K_SPACE, pygame.K_RETURN, pygame.K_BACKSPACE) and not score_submitted:
                         input_active = True
                         player_name = event.unicode
 
         if event.type == SPAWNPIPE and game_active:
             pipe_list.extend(create_pipe())
-        if event.type == BIRDFLAP:
+        
+        if event.type == BIRDFLAP and game_active:
             bird_index = (bird_index + 1) % 3
             bird_surface, bird_rect = bird_animation()
 
-    screen.blit(bg_surface, (0, 0))
+    screen.blit(active_bg, (0, 0))
+
     if game_active:
         bird_movement += gravity
         rotated_bird = rotate_bird(bird_surface)
@@ -195,15 +216,15 @@ while True:
                 name_surf = game_font.render(player_name, True, (255, 255, 255))
                 screen.blit(name_surf, (input_box.x + 10, input_box.y + 5))
             else:
-                # Show different prompts based on whether the score has been submitted
                 if score_submitted:
                     prompt_text = 'Score Saved! Space to Play Again'
                 else:
                     prompt_text = 'Space to Play, Type to Save'
                 prompt = small_font.render(prompt_text, True, (255, 255, 255))
                 screen.blit(prompt, (SCREEN_WIDTH/2 - prompt.get_width()/2, 450))
-        else:
+        else: # Initial menu screen
             screen.blit(message_surface, message_rect)
+            screen.blit(active_bird_frames[bird_index], bird_rect)
 
         if leaderboard_scores:
             title = small_font.render('Leaderboard', True, (255, 255, 255))

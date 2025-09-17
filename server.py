@@ -1,20 +1,6 @@
 import sqlite3
 from flask import Flask, request, jsonify
 
-# --- Database Setup ---
-def init_db():
-    conn = sqlite3.connect('highscores.db')
-    cursor = conn.cursor()
-    # Create the table if it doesn't exist
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS scores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            score INTEGER NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
 
 # --- Flask App ---
 app = Flask(__name__)
@@ -27,7 +13,7 @@ def hello_world():
 # Endpoint to GET the top 10 scores
 @app.route('/scores', methods=['GET'])
 def get_scores():
-    conn = sqlite3.connect('highscores.db')
+    conn = sqlite3.connect('./data/highscores.db')
     cursor = conn.cursor()
     cursor.execute('SELECT name, score FROM scores ORDER BY score DESC LIMIT 10')
     scores = cursor.fetchall()
@@ -43,7 +29,7 @@ def add_score():
     name = data['name']
     score = data['score']
     
-    conn = sqlite3.connect('highscores.db')
+    conn = sqlite3.connect('./data/highscores.db')
     cursor = conn.cursor()
     cursor.execute('INSERT INTO scores (name, score) VALUES (?, ?)', (name, score))
     conn.commit()
