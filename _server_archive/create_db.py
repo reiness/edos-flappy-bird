@@ -1,8 +1,5 @@
 import sqlite3
 
-# This script's only job is to create and set up the database table.
-# Render will run this once during the build process.
-
 conn = sqlite3.connect('./data/highscores.db')
 cursor = conn.cursor()
 

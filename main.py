@@ -1,7 +1,44 @@
 import pygame
 import sys
 import random
-import requests
+import sqlite3
+import os
+
+# --- Database Functions (Local) ---
+def get_db_path():
+    # Get the directory where the script/executable is running
+    # This ensures the database is always next to the .exe
+    application_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+    return os.path.join(application_path, 'local_scores.db')
+
+def init_local_db():
+    conn = sqlite3.connect(get_db_path())
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            score INTEGER NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def write_local_score(name, score):
+    if not name: return
+    conn = sqlite3.connect(get_db_path())
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO scores (name, score) VALUES (?, ?)', (name, int(score)))
+    conn.commit()
+    conn.close()
+
+def read_local_scores():
+    conn = sqlite3.connect(get_db_path())
+    cursor = conn.cursor()
+    cursor.execute('SELECT name, score FROM scores ORDER BY score DESC LIMIT 10')
+    scores = cursor.fetchall()
+    conn.close()
+    return [{'name': name, 'score': score} for name, score in scores]
 
 # --- Game Functions ---
 def draw_floor():
@@ -57,31 +94,13 @@ def score_display():
         high_score_rect = high_score_surface.get_rect(center=(SCREEN_WIDTH / 2, 850))
         screen.blit(high_score_surface, high_score_rect)
 
-# --- API Functions ---
-API_URL = "https://edos-flappy-bird.onrender.com"
-def submit_score(name, score):
-    if not name: return
-    payload = {'name': name, 'score': int(score)}
-    try:
-        requests.post(API_URL, json=payload)
-    except requests.exceptions.ConnectionError:
-        print("Could not connect to the server.")
-
-def get_high_scores():
-    try:
-        response = requests.get(API_URL)
-        if response.status_code == 200:
-            return response.json()
-    except requests.exceptions.ConnectionError:
-        print("Could not connect to the server.")
-    return []
-
 # --- Initialization ---
 pygame.mixer.pre_init(frequency=44100, size=16, channels=1, buffer=512)
 pygame.init()
+init_local_db() # Ensure the local DB file and table exist on startup
 SCREEN_WIDTH, SCREEN_HEIGHT = 576, 1024
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption('Flappy Bird by Edo')
+pygame.display.set_caption('Flappy Bird by Pythia')
 clock = pygame.time.Clock()
 game_font = pygame.font.Font('04B_19.ttf', 35)
 small_font = pygame.font.Font('04B_19.ttf', 25)
@@ -94,7 +113,7 @@ pipe_list = []
 player_name = ""
 input_active = False
 score_submitted = False
-leaderboard_scores = get_high_scores()
+leaderboard_scores = read_local_scores()
 gravity = 0.25
 bird_movement = 0
 
@@ -109,7 +128,7 @@ birds = {color: [pygame.transform.scale2x(pygame.image.load(f'sprites/{color}bir
 pipe_green = pygame.transform.scale2x(pygame.image.load('sprites/pipe-green.png'))
 pipe_red = pygame.transform.scale2x(pygame.image.load('sprites/pipe-red.png'))
 pipes = {'green': pipe_green, 'red': pipe_red}
-pipe_height = [400, 600, 800] # <-- THE FIX: This line has been restored.
+pipe_height = [400, 600, 800]
 game_over_surface = pygame.transform.scale2x(pygame.image.load('sprites/gameover.png').convert_alpha())
 game_over_rect = game_over_surface.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 200))
 message_surface = pygame.transform.scale2x(pygame.image.load('sprites/message.png').convert_alpha())
@@ -146,10 +165,10 @@ while True:
             else:
                 if input_active:
                     if event.key == pygame.K_RETURN:
-                        submit_score(player_name, score)
+                        write_local_score(player_name, score)
                         input_active = False
                         score_submitted = True
-                        leaderboard_scores = get_high_scores()
+                        leaderboard_scores = read_local_scores()
                     elif event.key == pygame.K_BACKSPACE:
                         player_name = player_name[:-1]
                     elif len(player_name) < 10:
@@ -179,13 +198,11 @@ while True:
 
         if event.type == SPAWNPIPE and game_active:
             pipe_list.extend(create_pipe())
-        
         if event.type == BIRDFLAP and game_active:
             bird_index = (bird_index + 1) % 3
             bird_surface, bird_rect = bird_animation()
 
     screen.blit(active_bg, (0, 0))
-
     if game_active:
         bird_movement += gravity
         rotated_bird = rotate_bird(bird_surface)
@@ -195,7 +212,7 @@ while True:
         if not check_collision(pipe_list):
             game_active = False
             pygame.time.set_timer(SPAWNPIPE, 0)
-            leaderboard_scores = get_high_scores()
+            leaderboard_scores = read_local_scores()
 
         pipe_list = move_pipes(pipe_list)
         draw_pipes(pipe_list)
@@ -222,7 +239,7 @@ while True:
                     prompt_text = 'Space to Play, Type to Save'
                 prompt = small_font.render(prompt_text, True, (255, 255, 255))
                 screen.blit(prompt, (SCREEN_WIDTH/2 - prompt.get_width()/2, 450))
-        else: # Initial menu screen
+        else:
             screen.blit(message_surface, message_rect)
             screen.blit(active_bird_frames[bird_index], bird_rect)
 

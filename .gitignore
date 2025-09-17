@@ -8,3 +8,4 @@ venv/
 
 # Local database file
 highscores.db
+local_scores.db
