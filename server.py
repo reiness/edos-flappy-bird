@@ -39,5 +39,5 @@ def add_score():
 
 # --- Main Execution ---
 if __name__ == '__main__':
-    init_db() # Ensure the database and table exist when the server starts
+
     app.run(debug=True)

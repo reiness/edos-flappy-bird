@@ -58,7 +58,7 @@ def score_display():
         screen.blit(high_score_surface, high_score_rect)
 
 # --- API Functions ---
-API_URL = "http://127.0.0.1:5000/scores"
+API_URL = "https://edos-flappy-bird.onrender.com"
 def submit_score(name, score):
     if not name: return
     payload = {'name': name, 'score': int(score)}
